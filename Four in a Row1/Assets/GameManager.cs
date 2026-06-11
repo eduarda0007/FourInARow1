@@ -1,132 +1,157 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.SceneManagement;
 
-public class GameManager : MonoBehaviour
+public class BoardManager : MonoBehaviour
 {
-    // TAMANHO DO TABULEIRO
-    public int rows = 6;
     public int columns = 7;
+    public int rows = 6;
 
-    // PREFABS DAS PEÇAS
-    public GameObject redPiece;
-    public GameObject yellowPiece;
+    public GameObject cellPrefab;
+    public GameObject redPiecePrefab;
+    public GameObject yellowPiecePrefab;
+    public TextMeshProUGUI winnerText;
+    public TextMeshProUGUI turnText;
 
-    // TEXTO DE VITÓRIA (UI)
-    public TextMeshProUGUI victoryText;
+    private bool isRedTurn = true;
+    private bool gameEnded = false;
 
-    // TABULEIRO LÓGICO
     private int[,] board;
-
-    // JOGADOR ATUAL (1 = vermelho, 2 = amarelo)
-    private int currentPlayer = 1;
 
     void Start()
     {
-        board = new int[rows, columns];
+        board = new int[columns, rows];
 
-        // Esconde o texto de vitória ao iniciar
-        if (victoryText != null)
-            victoryText.gameObject.SetActive(false);
+        CreateBoard();
+        UpdateTurnText();
     }
 
-    void Update()
+    void CreateBoard()
     {
-        if (Input.GetMouseButtonDown(0))
+        for (int x = 0; x < columns; x++)
         {
-            Vector2 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            int column = Mathf.RoundToInt(mousePos.x);
-            DropPiece(column);
-        }
-    }
-
-    // FAZ A PEÇA CAIR NA COLUNA
-    void DropPiece(int column)
-    {
-        if (column < 0 || column >= columns) return;
-
-        for (int row = 0; row < rows; row++)
-        {
-            if (board[row, column] == 0)
+            for (int y = 0; y < rows; y++)
             {
-                board[row, column] = currentPlayer;
-                SpawnPiece(row, column);
+                Vector2 position = new Vector2(
+                 x - (columns / 2f) + 0.5f,
+                 y - (rows / 2f) + 0.5f
+);
 
-                if (CheckWin(row, column))
-                {
-                    ShowVictory();
-                }
-                else
-                {
-                    SwitchPlayer();
-                }
-                break;
+                Instantiate(cellPrefab, position, Quaternion.identity, transform);
             }
         }
     }
 
-    // CRIA A PEÇA NA TELA
-    void SpawnPiece(int row, int column)
+    void Update()
     {
-        GameObject piecePrefab = currentPlayer == 1 ? redPiece : yellowPiece;
-        Vector2 position = new Vector2(column, row);
-        Instantiate(piecePrefab, position, Quaternion.identity);
+        if (gameEnded)
+            return;
+        if (Input.GetMouseButtonDown(0))
+        {
+            Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+
+            int column = Mathf.RoundToInt(mousePosition.x + (columns / 2f) - 0.5f);
+
+            DropPiece(column);
+        }
     }
 
-    // TROCA O JOGADOR
-    void SwitchPlayer()
+    void DropPiece(int column)
     {
-        currentPlayer = (currentPlayer == 1) ? 2 : 1;
+        if (column < 0 || column >= columns)
+            return;
+
+        bool piecePlaced = false;
+
+        for (int y = 0; y < rows; y++)
+        {
+            if (board[column, y] == 0)
+            {
+                board[column, y] = isRedTurn ? 1 : 2;
+
+                Vector2 position = new Vector2(
+                    column - (columns / 2f) + 0.5f,
+                    y - (rows / 2f) + 0.5f
+                );
+
+                GameObject piecePrefab = isRedTurn ? redPiecePrefab : yellowPiecePrefab;
+
+                Instantiate(piecePrefab, position, Quaternion.identity);
+
+                if (CheckWin(column, y))
+                {
+                    winnerText.gameObject.SetActive(true);
+
+                    winnerText.text = (isRedTurn ? "Vermelho" : "Amarelo") + " venceu!";
+                    gameEnded = true;
+                }
+                else
+                {
+                    isRedTurn = !isRedTurn;
+                    UpdateTurnText();
+                }
+
+                piecePlaced = true;
+
+                break;
+            }
+        }
+
+        if (!piecePlaced)
+        {
+            Debug.Log("Coluna cheia!");
+        }
     }
 
-    // VERIFICA SE ALGUÉM GANHOU
-    bool CheckWin(int row, int column)
+    bool CheckWin(int column, int row)
     {
-        return CheckDirection(row, column, 1, 0) ||   // Horizontal
-               CheckDirection(row, column, 0, 1) ||   // Vertical
-               CheckDirection(row, column, 1, 1) ||   // Diagonal \
-               CheckDirection(row, column, 1, -1);    // Diagonal /
+        int currentPlayer = board[column, row];
+
+        return CheckDirection(column, row, 1, 0, currentPlayer) || // Horizontal
+               CheckDirection(column, row, 0, 1, currentPlayer) || // Vertical
+               CheckDirection(column, row, 1, 1, currentPlayer) || // Diagonal \
+               CheckDirection(column, row, 1, -1, currentPlayer);  // Diagonal /
     }
 
-    bool CheckDirection(int row, int column, int dirX, int dirY)
+    bool CheckDirection(int column, int row, int dirX, int dirY, int player)
     {
         int count = 1;
 
-        count += CountPieces(row, column, dirX, dirY);
-        count += CountPieces(row, column, -dirX, -dirY);
+        count += CountPieces(column, row, dirX, dirY, player);
+        count += CountPieces(column, row, -dirX, -dirY, player);
 
         return count >= 4;
     }
 
-    int CountPieces(int row, int column, int dirX, int dirY)
+    int CountPieces(int startX, int startY, int dirX, int dirY, int player)
     {
         int count = 0;
-        int r = row + dirY;
-        int c = column + dirX;
 
-        while (r >= 0 && r < rows &&
-               c >= 0 && c < columns &&
-               board[r, c] == currentPlayer)
+        int x = startX + dirX;
+        int y = startY + dirY;
+
+        while (
+            x >= 0 && x < columns &&
+            y >= 0 && y < rows &&
+            board[x, y] == player
+        )
         {
             count++;
-            r += dirY;
-            c += dirX;
+
+            x += dirX;
+            y += dirY;
         }
 
         return count;
     }
 
-    // MOSTRA A VITÓRIA NA TELA
-    void ShowVictory()
+    void UpdateTurnText()
     {
-        if (victoryText == null) return;
+        turnText.text = isRedTurn ? "Vez do Vermelho" : "Vez do Amarelo";
+    }
 
-        victoryText.gameObject.SetActive(true);
-
-        if (currentPlayer == 1)
-            victoryText.text = "VITÓRIA\nEquipe Vermelha";
-        else
-            victoryText.text = "VITÓRIA\nEquipe Amarela";
-
-        enabled = false; // Para o jogo
+    public void RestartGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }

@@ -14,13 +14,20 @@ public class BoardGenerator : MonoBehaviour
 
     void GenerateBoard()
     {
-        for (int row = 0; row < rows; row++)
+        void CreateBoard()
         {
-            for (int col = 0; col < columns; col++)
+            for (int x = 0; x < columns; x++)
             {
-                Vector2 position = new Vector2(col * cellSize, row * cellSize);
-                Instantiate(cellPrefab, position, Quaternion.identity, transform);
+                for (int y = 0; y < rows; y++)
+                {
+                    Vector2 position = new Vector2(
+                        x - (columns / 2f) + 0.5f,
+                        y - (rows / 2f) + 0.5f
+                    );
+
+                    Instantiate(cellPrefab, position, Quaternion.identity, transform);
+                }
             }
         }
-    }
+     }
 }
