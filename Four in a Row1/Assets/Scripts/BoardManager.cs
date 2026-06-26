@@ -15,11 +15,6 @@ public class BoardManager : MonoBehaviour
     public TextMeshProUGUI turnText;
 
 
-    // rede
-    public SimpleClient client;
-    public SimpleServer server;
-
-
     private bool isRedTurn = true;
     private bool gameEnded = false;
 
@@ -65,52 +60,37 @@ public class BoardManager : MonoBehaviour
 
 
 
-    void Update()
+void Update()
+{
+    if (gameEnded)
+        return;
+
+    if (TCPManager.Instance != null &&
+        !TCPManager.Instance.MeuTurno)
+        return;
+
+    if (Input.GetMouseButtonDown(0))
     {
+        Vector2 mousePosition =
+            Camera.main.ScreenToWorldPoint(
+                Input.mousePosition
+            );
 
-        if (gameEnded)
-            return;
+        int column =
+            Mathf.RoundToInt(
+                mousePosition.x +
+                (columns / 2f) -
+                0.5f
+            );
 
+        bool played = DropPiece(column);
 
-
-        if (Input.GetMouseButtonDown(0))
+        if (played)
         {
-
-            Vector2 mousePosition =
-                Camera.main.ScreenToWorldPoint(
-                    Input.mousePosition
-                );
-
-
-
-            int column =
-                Mathf.RoundToInt(
-                    mousePosition.x +
-                    (columns / 2f) -
-                    0.5f
-                );
-
-
-
-            bool played =
-                DropPiece(column);
-
-
-
-            if (played)
-            {
-
-                // envia jogada
-                if (client != null)
-                {
-                    client.SendMove(column);
-                }
-
-            }
-
+            TCPManager.Instance.EnviarJogada(column);
         }
-
     }
+}
 
 
 
@@ -367,6 +347,9 @@ public class BoardManager : MonoBehaviour
         );
 
     }
-
+    public void JogadaRecebida(int coluna)
+{
+    DropPiece(coluna);
+}
 
 }
